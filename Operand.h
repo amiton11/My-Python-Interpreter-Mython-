@@ -17,7 +17,12 @@ enum OperandType
 	BigEqu = '>' * '=' % 256,
 	SmlEqu = '<' * '=' % 256,
 	Or = '|' * '|' % 256,
-	And = '&' * '&' % 256
+	And = '&' * '&' % 256,
+	Asgn = '=',
+	AsgnMul = '*' * '=' % 256,
+	AsgnDiv = '/' * '=' % 256,
+	AsgnAdd = '+' * '=' % 256,
+	AsgnSub = '-' * '=' % 256
 };
 
 class Operand : public Type

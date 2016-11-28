@@ -4,8 +4,9 @@
 std::unordered_map<std::string, Type*> _variables;
 const std::string reservedWords[] = { "return", "def", "True", "False" };
 const std::string sizeTwoOps[] = { "==", "!=", ">=", "<=", "||", "&&" };
-const char sizeOneOps[] = { '+', '-', '*', '/', '%', '>', '<' };
+const char sizeOneOps[] = { '*', '/', '%', '+', '-', '>', '<' };
 const char legalComplex[] = {'[', ']', '(', ')', ','};
+const std::pair<const char, const char> openAndClose[] = { { '"', '"' }, { '\'', '\'' }, { '(', ')' }, { '[', ']' }, { '{', '}' } };
 
 Type* Parser::parseString(std::string str, std::unordered_map<std::string, Type*>* localVarMap) throw()
 {
@@ -98,7 +99,7 @@ Type* Parser::getType(const std::string &str, std::unordered_map<std::string, Ty
 	{
 		returnVal = new Float(std::stod(str));
 	}
-	else if (str[0] == '[' && str[str.length() - 1] == ']')
+	else if (str[0] == '[' && findCloser({ '[', ']' }, str) == str.size() - 1)
 	{
 		std::string insideStr = str.substr(1, str.length() - 2);
 		returnVal = new List(stringToVector(insideStr));
@@ -133,7 +134,6 @@ bool Parser::isLegalFuncCall (const std::string& str)
 {
 	std::size_t lBracket, rBracket;
 	rBracket = str.find_last_of(')');
-	lBracket = str.find_last_of('(');
 	if (lBracket == std::string::npos || rBracket == std::string::npos)
 		return false;
 	std::string funcName = str.substr(0, lBracket);
@@ -483,6 +483,195 @@ std::vector<std::string> Parser::getComplexWords(const std::string &str)
 		keyWords.push_back(str.substr(last, i - last));
 	}
 	return keyWords;
+}
+
+TreeNode* Parser::getComplexTree(std::string &str)
+{
+	if (str == "")
+		return nullptr;
+	// check if all string is between parentheses
+	if (str[0] == '(' && findCloser({ '(', ')' }, str, 1) == str.size() - 1)
+		return getComplexTree(str.substr(1, str.size() - 1));
+	// check for openers and closers inside the code
+	auto insideRange = findInsideRange(str);
+	int i, vecIdx;
+	// check for assigners
+	for (i = str.size() - 1, vecIdx = insideRange.size() - 1; i >= 0; i--)
+	{
+		if (str[i] == '=')
+		{
+			if (i > 0)
+			{
+				if (str[i - 1] == '=' || str[i - 1] == '!' || str[i - 1] == '>' || str[i - 1] == '<')
+				{
+					i -= 1;
+					continue;
+				}
+				if (str[i - 1] == '*' || str[i - 1] == '/' || str[i - 1] == '+' || str[i - 1] == '-')
+					return new TreeNode(str.substr(i - 1, 2), getComplexTree(str.substr(0, i - 1)), getComplexTree(str.substr(i + 1, str.size() - i - 1)));
+			}
+			return new TreeNode("=", getComplexTree(str.substr(0, i)), getComplexTree(str.substr(i + 1, str.size() - i - 1)));
+		}
+		if (vecIdx >= 0 && insideRange[vecIdx].second.second == i)
+			i = insideRange[vecIdx--].second.first;
+	}
+	// check for Comparers
+	for (i = str.size() - 1, vecIdx = insideRange.size() - 1; i > 0; i--)
+	{
+		std::string curOp = str.substr(i - 1, 2);
+		for each(std::string compOp in sizeTwoOps)
+			if (compOp == curOp)
+				return new TreeNode(curOp, getComplexTree(str.substr(0, i - 1)), getComplexTree(str.substr(i + 1, str.size() - i - 1)));
+		if (vecIdx >= 0 && insideRange[vecIdx].second.second == i)
+			i = insideRange[vecIdx--].second.first;
+	}
+	// check for + and -
+	for (i = str.size() - 1, vecIdx = insideRange.size() - 1; i >= 0; i--)
+	{
+		if (str[i] == '+' || str[i] == '-')
+			return new TreeNode(str.substr(i, 1), getComplexTree(str.substr(0, i)), getComplexTree(str.substr(i + 1, str.size() - i - 1)));
+		if (vecIdx >= 0 && insideRange[vecIdx].second.second == i)
+			i = insideRange[vecIdx--].second.first;
+	}
+	// check for *, / and %
+	for (i = str.size() - 1, vecIdx = insideRange.size() - 1; i >= 0; i--)
+	{
+		if (str[i] == '*' || str[i] == '/' || str[i] == '%')
+			return new TreeNode(str.substr(i, 1), getComplexTree(str.substr(0, i)), getComplexTree(str.substr(i + 1, str.size() - i - 1)));
+		if (vecIdx >= 0 && insideRange[vecIdx].second.second == i)
+			i = insideRange[vecIdx--].second.first;
+	}
+	// check for indexers
+	for (i = insideRange.size() - 1; i >= 0; i--)
+	{
+		auto curRange = insideRange[i];
+		if (curRange.first == '[' && curRange.second.first != 0)
+		{
+			if (curRange.second.second == str.size() - 1)
+				return new TreeNode(std::string("[]"), getComplexTree(str.substr(0, curRange.second.first)), getComplexTree(str.substr(curRange.second.first + 1, curRange.second.second - curRange.second.first - 2)));
+			else
+				throw new InterperterException();
+		}
+		
+	}
+	// check for ! (not sign)
+	for (i = str.size() - 1, vecIdx = insideRange.size() - 1; i >= 0; i--)
+	{
+		if (str[i] == '!')
+			return new TreeNode("!", getComplexTree(str.substr(0, i)));
+		if (vecIdx >= 0 && insideRange[vecIdx].second.second == i)
+			i = insideRange[vecIdx--].second.first;
+	}
+}
+
+TreeNode* Parser::getInsideTree(std::string &str, std::string &val)
+{
+	TreeNode* curTree = new TreeNode(val);
+	if (str == "")
+		curTree;
+	// check if all string is between parentheses
+	if (str[0] == '(' && findCloser({ '(', ')' }, str, 1) == str.size() - 1)
+	{
+		curTree->pushChild(getComplexTree(str.substr(1, str.size() - 1)));
+		return curTree;
+	}
+	// check for openers and closers inside the code
+	auto insideRange = findInsideRange(str);
+	int i, vecIdx, last;
+	last = 0;
+	//check for coma(,)
+	for (i = str.size() - 1, vecIdx = insideRange.size() - 1; i > 0; i--)
+	{
+		if (str[i] == ',')
+		{
+			if (i >= last)
+				throw new InterperterException();
+			curTree->pushChild(getComplexTree(str.substr(last, i - last)));
+			last = i + 1;
+		}
+		if (vecIdx >= 0 && insideRange[vecIdx].second.second == i)
+			i = insideRange[vecIdx--].second.first;
+	}
+	curTree->pushChild(getComplexTree(str.substr(last, str- last)));
+	last = i + 1;
+}
+
+std::vector<std::pair<char, std::pair<int, int>>> Parser::findInsideRange(std::string &str)
+{
+	std::vector<std::pair<char, std::pair<int, int>>> insideRange;
+	int opener, closer;
+	closer = -1;
+	for (int i = 0; i < str.length(); i++)
+	{
+		for (int j = 0; j < 5; j++)
+		{
+			if (str[i] != openAndClose[j].first)
+				continue;
+			int closer = findCloser(openAndClose[j], str, i + 1);
+			if (closer == -1)
+				throw new InterperterException(); // should be an opener exception
+
+			// push a pair containg the data about what opener we talk about, and the range between this opener and his closer
+			insideRange.push_back({ openAndClose[j].first, { i, closer } });
+
+			i = closer;
+			break;
+		}
+	}
+	return insideRange;
+}
+
+int Parser::findCloser(std::pair<const char, const char> openerAndCloser, const std::string &str, int pos)
+{
+	return findCloser(openerAndCloser.first, openerAndCloser.second, str, pos);
+}
+int Parser::findCloser(char opener, char closer, const std::string &str, int pos)
+{
+	int openersCount = 0;
+	if (opener != '"' && opener != '\'')
+	{
+		char curQuote = 0;
+		for (int i = pos; i < str.length(); i++)
+		{
+			if (curQuote == 0)
+			{
+				if (closer == str[i])
+				{
+					if (openersCount == 0)
+						return i;
+					openersCount--;
+					continue;
+				}
+				else if (opener == str[i])
+					openersCount++;
+				else if ('\'' == str[i] || '"' == str[i])
+				{
+					curQuote = str[i];
+				}
+			}
+			else
+			{
+				if (curQuote == str[i])
+					curQuote = 0;
+			}
+		}
+	}
+	else
+	{
+		for (int i = pos; i < str.length(); i++)
+		{
+			if (closer == str[i])
+			{
+				if (openersCount == 0)
+					return i;
+				openersCount--;
+				continue;
+			}
+			if (opener == str[i])
+				openersCount++;
+		}
+	}
+	return -1;
 }
 
 void Parser::makeAssignment(const std::string& str, std::unordered_map<std::string, Type*>* localVarMap)
