@@ -1,4 +1,4 @@
-#include "type.h"
+#include "Type.h"
 #include "Boolean.h"
 
 void Type::setIsTemp(bool isTemp)
@@ -42,6 +42,11 @@ Type::operator char()
 Type::operator double()
 {
 	throw new TypeException();
+}
+
+Type* Type::operator!()
+{
+	return new Boolean(!(bool)this);
 }
 
 Type* Type::operator+(Type* other)

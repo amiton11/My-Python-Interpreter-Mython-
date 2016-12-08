@@ -1,7 +1,7 @@
 #ifndef INTEGER_H
 #define INTEGER_H
 
-#include "type.h"
+#include "Type.h"
 #include "Boolean.h"
 
 class Integer : public Type

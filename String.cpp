@@ -24,25 +24,55 @@ std::string String::toString() const
 	return "'" + _value + "'";
 }
 
-Type* String::operator[] (Type* index) const
+Type* String::operator[] (std::vector<Type*> index) const
 {
-	if (_value == "")
-		return nullptr;
-	int i = (int)(*index);
-	i = i % _value.size();
-	if (i < 0)
-		i += _value.size();
-	return new Character(_value[i]);
+	std::string newStr = "";
+	int start = 0, end = _value.size(), step = 1, i;
+	switch (index.size())
+	{
+	case 1:
+		i = getFixedIndex((int)(*index[0]));
+		return new Character(_value[i]);
+		break;
+	case 2:
+		if (index[0]->getTypeName() != ClassType::VoidC)
+			start = getFixedIndex((int)(*index[0]));
+		if (index[1]->getTypeName() != ClassType::VoidC)
+			end = getFixedIndex((int)(*index[1]));
+		return new String(_value.substr(start, end - start));
+		break;
+	case 3:
+		if (index[0]->getTypeName() != ClassType::VoidC)
+			start = getFixedIndex((int)(*index[0]));
+		if (index[1]->getTypeName() != ClassType::VoidC)
+			end = getFixedIndex((int)(*index[1]));
+		if (index[2]->getTypeName() != ClassType::VoidC)
+			step = (int)(*index[2]);
+		while (start < end)
+		{
+			newStr += _value[start];
+			start += step;
+		}
+		return new String(newStr);
+		break;
+	default:
+		throw new InterperterException(); // should be an index exception
+		break;
+	}
 }
 void String::setAtIndex(Type* index, Type* item)
 {
-	if (_value == "")
-		return;
-	int i = (int)(*index);
-	i = i % _value.size();
-	if (i < 0)
-		i += _value.size();
+	int i = getFixedIndex((int)(*index));
 	_value[i] = (char)(*item);
+}
+
+int String::getFixedIndex(int index) const
+{
+	if (index < 0)
+		index += _value.size();
+	if (index < 0 || index > _value.size() - 1)
+		throw new InterperterException(); // should be an index error;
+	return index;
 }
 
 Type* String::clone() const

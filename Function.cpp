@@ -1,7 +1,7 @@
 
 #include "Function.h"
 
-Function::Function(std::vector<std::string> parametersNames, std::vector<std::string> lines) : Function(parametersNames)
+Function::Function(std::vector<std::string> parametersNames, std::vector<TreeNode*> lines) : Function(parametersNames)
 {
 	_lines = lines;
 }
@@ -11,13 +11,13 @@ Function::Function(std::vector<std::string> parametersNames)
 	_myType = ClassType::FunctionC;
 }
 
-std::vector<std::string> Function::getLines() const
+std::vector<TreeNode*> Function::getLines() const
 {
 	return _lines;
 }
-void Function::setLines(std::vector<std::string> lines)
+void Function::setLines(std::vector<TreeNode*> lines)
 {
-	_lines = std::vector<std::string>(lines.begin(), lines.end());
+	_lines = std::vector<TreeNode*>(lines.begin(), lines.end());
 }
 std::vector<std::string> Function::getParameters() const
 {
@@ -34,11 +34,19 @@ Type* Function::run(std::vector<Type*> parameters)
 		throw new ParameterException();
 	for (int i = 0; i < parameters.size(); i++)
 		_localVars[_parametersNames[i]] = parameters[i];
-	for each (std::string line in _lines)
+	for each (TreeNode* line in _lines)
 	{
 		try
 		{
-			Type* returnVal = Parser::parseString(line, &_localVars);
+			if (line == nullptr)
+				break;
+			if (line->getValue() == "return")
+			{
+				if (line->childCount() != 1 || line->getChildAt(0) == nullptr)
+					break;
+				return Parser::runCommand(line->getChildAt(0), &_localVars);
+			}
+			Type* returnVal = Parser::runCommand(line, &_localVars);
 			if (returnVal->isPrintable())
 				std::cout << returnVal->toString() << std::endl;
 			if (returnVal->getIsTemp())
@@ -48,12 +56,6 @@ Type* Function::run(std::vector<Type*> parameters)
 		{
 			std::cout << ex->what() << std::endl;
 			return new Void();
-		}
-		if (Parser::getVariableValue("return", &_localVars) != nullptr)
-		{
-			Type* returnVar = _localVars["return"]->clone();
-			Parser::freeMemory(&_localVars);
-			return returnVar;
 		}
 	}
 	Parser::freeMemory(&_localVars);
@@ -70,17 +72,14 @@ bool Function::parseInto()
 
 	while (input_string != "" && (input_string[0] == ' ' || input_string[0] == '\t'))
 	{
+		TreeNode* curLine;
 		Helper::trim(input_string);
-		if (!(Parser::isLegalVarName(input_string) || Parser::isLegalFuncCall(input_string) || 
-			Parser::isLegalAssigment(input_string) || Parser::isLegalReturn(input_string) ||
-			Parser::isLegalComplex(input_string)))
-		{
-			Type* tempType = Parser::getType(input_string);
-			if (tempType == nullptr)
-				return false;
-			delete tempType;
-		}
-		_lines.push_back(input_string);
+		if (Parser::isLegalReturn(input_string))
+			curLine = new TreeNode("return", Parser::getComplexTree(Parser::getCleanStr(input_string.substr(7, input_string.size() - 7))));
+		else
+			curLine = Parser::getComplexTree(Parser::getCleanStr(input_string));
+		
+		_lines.push_back(curLine);
 
 		std::cout << ">>> ";
 		std::getline(std::cin, input_string);

@@ -8,72 +8,120 @@ const char sizeOneOps[] = { '*', '/', '%', '+', '-', '>', '<' };
 const char legalComplex[] = {'[', ']', '(', ')', ','};
 const std::pair<const char, const char> openAndClose[] = { { '"', '"' }, { '\'', '\'' }, { '(', ')' }, { '[', ']' }, { '{', '}' } };
 
-Type* Parser::parseString(std::string str, std::unordered_map<std::string, Type*>* localVarMap) throw()
+Type* Parser::parseString(std::string str)
 {
-	if (str[0] == ' ' || str[0] == '\t')
+	if ((str.size() > 0) && str[0] == ' ' || str[0] == '\t')
 		throw new IndentationException();
 	Helper::trim(str);
-	if (str.length() > 0)
+	Type* returnVal = nullptr;
+	if (str.size() == 0)
+		return nullptr;
+	if (isLegalFuncAssign(str))
 	{
-		Type* returnVal;
-		if (isLegalAssigment(str))
-		{
-			makeAssignment(str, localVarMap);
-			returnVal = new Void();
-			returnVal->setIsTemp(true);
-			return returnVal;
-		}
-
-		if (isLegalFuncCall(str))
-		{
-			returnVal = callFunc(str, localVarMap);
-			if (returnVal == nullptr)
-				throw new NameErrorException(str);
-			return returnVal;
-		}
-		returnVal = getType(str);
-	 	if (returnVal != nullptr)
-		{
-			returnVal->setIsTemp(true);
-			return returnVal;
-		}
-		if (isLegalVarName(str))
-		{
-			returnVal = getVariableValue(str, localVarMap);
-			if (returnVal == nullptr)
-				throw new NameErrorException(str);
-			return returnVal;
-		}
-		if (isLegalIndexer(str))
-		{
-		}
-		if (isLegalComplex(str))
-		{
-			returnVal = calcComplex(str, localVarMap);
-			returnVal->setIsTemp(true);
-			return returnVal;
-		}
-		if (localVarMap != nullptr && isLegalReturn(str))
-		{
-			assignReturnValue(str, localVarMap);
-			returnVal = new Void();
-			returnVal->setIsTemp(true);
-			return returnVal;
-		}
-		Function* newFunc = assignFunc(str);
-		if (newFunc != nullptr)
-		{
-			bool parseSuccesful = newFunc->parseInto();
-			if (!parseSuccesful)
-				throw new SyntaxException();
-			returnVal = new Void();
-			returnVal->setIsTemp(true);
-			return returnVal;
-		}
-		throw new SyntaxException();
+		Function* newFunc = assignFunc(getCleanStr(str.substr(4, str.size() - 4))); // 4 is the size of the string "def "
+		bool parseSuccesful = newFunc->parseInto();
+		if (!parseSuccesful)
+			throw new SyntaxException();
+		returnVal = new Void();
+		returnVal->setIsTemp(true);
+		return returnVal;
 	}
+	TreeNode* curLineTree = getComplexTree(getCleanStr(str));
+	returnVal = runCommand(curLineTree);
+	if (!returnVal->getIsTemp())
+	{
+		returnVal = returnVal->clone();
+		returnVal->setIsTemp(true);
+	}
+	return returnVal;
+}
+//Type* Parser::parseString(std::string str, std::unordered_map<std::string, Type*>* localVarMap) throw()
+//{
+//	if (str[0] == ' ' || str[0] == '\t')
+//		throw new IndentationException();
+//	Helper::trim(str);
+//	if (str.length() > 0)
+//	{
+//		Type* returnVal;
+//		if (isLegalAssigment(str))
+//		{
+//			makeAssignment(str, localVarMap);
+//			returnVal = new Void();
+//			returnVal->setIsTemp(true);
+//			return returnVal;
+//		}
+//
+//		if (isLegalFuncCall(str))
+//		{
+//			returnVal = callFunc(str, localVarMap);
+//			if (returnVal == nullptr)
+//				throw new NameErrorException(str);
+//			return returnVal;
+//		}
+//		returnVal = getType(str);
+//	 	if (returnVal != nullptr)
+//		{
+//			returnVal->setIsTemp(true);
+//			return returnVal;
+//		}
+//		if (isLegalVarName(str))
+//		{
+//			returnVal = getVariableValue(str, localVarMap);
+//			if (returnVal == nullptr)
+//				throw new NameErrorException(str);
+//			return returnVal;
+//		}
+//		if (isLegalIndexer(str))
+//		{
+//		}
+//		if (isLegalComplex(str))
+//		{
+//			returnVal = calcComplex(str, localVarMap);
+//			returnVal->setIsTemp(true);
+//			return returnVal;
+//		}
+//		if (localVarMap != nullptr && isLegalReturn(str))
+//		{
+//			assignReturnValue(str, localVarMap);
+//			returnVal = new Void();
+//			returnVal->setIsTemp(true);
+//			return returnVal;
+//		}
+//		Function* newFunc = assignFunc(str);
+//		if (newFunc != nullptr)
+//		{
+//			bool parseSuccesful = newFunc->parseInto();
+//			if (!parseSuccesful)
+//				throw new SyntaxException();
+//			returnVal = new Void();
+//			returnVal->setIsTemp(true);
+//			return returnVal;
+//		}
+//		throw new SyntaxException();
+//	}
+//
+//	return nullptr;
+//}
 
-	return nullptr;
+std::string Parser::getCleanStr(std::string &str)
+{
+	std::string cleanStr = "";
+	for (int i = 0; i < str.size(); i++)
+	{
+		if (str[i] == '"' || str[i] == '\'')
+		{
+			int closer = findCloser(str[i], str[i], str, i + 1);
+			if (closer == -1)
+				throw new InterperterException();
+			cleanStr += str.substr(i, closer - i + 1);
+			i = closer;
+			continue;
+		}
+		if (str[i] == ' ')
+			continue;
+		cleanStr += str[i];
+	}
+	return cleanStr;
 }
 
 Type* Parser::getType(const std::string &str, std::unordered_map<std::string, Type*>* localVarMap)
@@ -99,13 +147,9 @@ Type* Parser::getType(const std::string &str, std::unordered_map<std::string, Ty
 	{
 		returnVal = new Float(std::stod(str));
 	}
-	else if (str[0] == '[' && findCloser({ '[', ']' }, str) == str.size() - 1)
-	{
-		std::string insideStr = str.substr(1, str.length() - 2);
-		returnVal = new List(stringToVector(insideStr));
-	}
 	return returnVal;
 }
+
 
 bool Parser::isLegalVarName(const std::string& str)
 {
@@ -113,72 +157,20 @@ bool Parser::isLegalVarName(const std::string& str)
 		return false;
 
 	for (unsigned int i = 1; i < str.length(); i++)
-	{
 		if (!(Helper::isDigit(str[i]) || Helper::isLetter(str[i]) || Helper::isUnderscore(str[i])))
-		{
 			return false;
-		}
-	}
 		
 	for each (std::string reservedWord in reservedWords)
-	{
-		if (!std::strcmp(reservedWord.c_str(), str.c_str()))
-		{
+		if (reservedWord == str)
 			return false;
-		}
-	}
 		
 	return true;
 }
-bool Parser::isLegalFuncCall (const std::string& str)
+bool Parser::isLegalType(const std::string& str)
 {
-	std::size_t lBracket, rBracket;
-	rBracket = str.find_last_of(')');
-	if (lBracket == std::string::npos || rBracket == std::string::npos)
-		return false;
-	std::string funcName = str.substr(0, lBracket);
-
-	if (funcName == "" || (!isLegalVarName(funcName) && !isLegalIndexer(funcName)))
-		return false;
-
-	std::string parametersStr = str.substr(lBracket + 1, rBracket - lBracket - 1);
-	if (parametersStr == "")
+	if (Helper::isInteger(str) || Helper::isBoolean(str) || Helper::isString(str) || Float::isFloat(str))
 		return true;
-
-	std::vector<std::string> parameters = getKeyWords(parametersStr);
-	for (auto paramater : parameters)
-	{
-		if (!isLegalType(paramater) && !isLegalVarName(paramater) && !isLegalComplex(paramater) && !isLegalFuncCall(paramater) && !isLegalIndexer)
-			return false;
-	}
-	return true;
-}
-bool Parser::isLegalAssigment(const std::string& str)
-{
-	int equSign = str.find_first_of('=');
-
-	if (equSign == std::string::npos || equSign == 0 || equSign == str.size() - 1 || str[equSign + 1] == '=' || str[equSign - 1] == '!'
-		|| str[equSign - 1] == '<' || str[equSign - 1] == '>')
-	{
-		return false;
-	}
-
-	std::string varName = str.substr(0, equSign);
-	std::string valueStr = str.substr(equSign + 1);
-
-	Helper::rtrim(varName);
-	Helper::ltrim(valueStr);
-
-	if (varName.length() == 0 || valueStr.length() == 0)
-		return false;
-
-	if (!isLegalVarName(varName))
-		throw new SyntaxException();
-
-	if (!isLegalType(valueStr) && !isLegalVarName(valueStr) && !isLegalFuncCall(valueStr) && !isLegalComplex(valueStr) && !isLegalIndexer(valueStr))
-		throw new SyntaxException();
-
-	return true;
+	return false;
 }
 bool Parser::isLegalReturn(const std::string& str)
 {
@@ -186,67 +178,22 @@ bool Parser::isLegalReturn(const std::string& str)
 	if (firstSpace == std::string::npos)
 		return false;
 	std::string firstWord = str.substr(0, firstSpace);
-	if (firstWord != "return")
-		return false;
-
-	std::string valueStr = str.substr(firstSpace + 1);
-	Helper::trim(valueStr);
-
-	if (isLegalVarName(valueStr) || isLegalType(valueStr) || isLegalFuncCall(valueStr) || isLegalComplex(valueStr) || isLegalIndexer(valueStr))
+	if (firstWord == "return")
 		return true;
-
-	throw new SyntaxException();
-}
-bool Parser::isLegalComplex(const std::string& str)
-{
-	std::vector<std::string> keyWords = getComplexWords(str);
-	if (keyWords.empty())
-		return false;
-	for (std::string keyWord : keyWords)
-	{
-		if (!isLegalType(keyWord) && !isLegalVarName(keyWord) && !isLegalFuncCall(keyWord))
-			return false;
-	}
-	return true;
-}
-bool Parser::isLegalType(const std::string& str)
-{
-	if (Helper::isInteger(str) || Helper::isBoolean(str) || Helper::isString(str) || Float::isFloat(str))
-		return true;
-	else if (str[0] == '[' && str[str.length() - 1] == ']')
-	{
-		std::vector<std::string> items = getKeyWords(str.substr(1, str.size() - 2));
-		for (auto item : items)
-		{
-			if (!isLegalType(item) && !isLegalVarName(item) && !isLegalComplex(item) && !isLegalFuncCall(item) && !isLegalIndexer(item))
-				return false;
-		}
-		return true;
-	}
-	return false;
-}
-bool Parser::isLegalIndexer(const std::string& str)
-{
-	/*std::size_t lBracket, rBracket;
-	lBracket = str.find_first_of('[');
-	rBracket = str.find_last_of(']');
-	if (lBracket == std::string::npos || rBracket == std::string::npos)
-		return false;
-	std::string varName = str.substr(0, lBracket);
-
-	if (varName == "" || (!isLegalVarName(varName) && !isLegalIndexer(varName) && !isLegalFuncCall(varName) && !isLegalType(varName) && !isLegalComplex(varName)))
-		return false;
-
-	std::string index = str.substr(lBracket + 1, rBracket - lBracket - 1);
-	if (index == "")
-		return false;
-
-	return isLegalType(index) || isLegalVarName(index) || isLegalFuncCall(index) || isLegalComplex(index) || isLegalIndexer(index);*/
 
 	return false;
 }
+bool Parser::isLegalFuncAssign(const std::string& str)
+{
+	int firstSpace = str.find_first_of(" \t");
+	if (firstSpace == std::string::npos)
+		return false;
+	std::string firstWord = str.substr(0, firstSpace);
+	if (firstWord == "def")
+		return true;
 
-
+	return false;
+}
 Type* Parser::getVariableValue(const std::string &str, std::unordered_map<std::string, Type*>* varMap)
 {
 	if (varMap == nullptr)
@@ -261,81 +208,6 @@ Type* Parser::getVariableValue(const std::string &str, std::unordered_map<std::s
 	}
 	return got->second;
 }
-//Type* Parser::getValueAtIndex(const std::string &str, std::unordered_map<std::string, Type*>* localVarMap)
-//{
-//
-//}
-//void Parser::setValueAtIndex(const std::string &str, Type* val, std::unordered_map<std::string, Type*>* localVarMap)
-//{
-//
-//}
-//std::pair<Type*, Type*> Parser::getVarAndIndx(const std::string &str, std::unordered_map<std::string, Type*>* localVarMap)
-//{
-//	int lBracket = str.find_first_of('[');
-//	int rBracket = str.find_last_of(']');
-//	std::string varName = str.substr(0, lBracket);
-//	std::string index = str.substr(lBracket + 1, rBracket - lBracket - 1);
-//	Type* var = getValue(varName)
-//}
-//std::pair<int, int> Parser::getBrackets(std::string str)
-//{
-//	std::vector<char> openers;
-//	int firstBracket;
-//	for (int i = 0; i < str.size() - 1; i++)
-//	{
-//		if (openers.back() == '\'')
-//		{
-//			if (str[i] == '\'')
-//				openers.pop_back();
-//			continue;
-//		}
-//		if (openers.back() == '\"')
-//		{
-//			if (str[i] == '\"')
-//				openers.pop_back();
-//			continue;
-//		}
-//		switch ( str[i])
-//		{
-//		default:
-//			break;
-//		}
-//
-//	}
-//}
-Type* Parser::getValue(std::string valueStr, std::unordered_map<std::string, Type*>* varMap)
-{
-	Type* value;
-	if (isLegalVarName(valueStr))
-	{
-		value = getVariableValue(valueStr, varMap);
-
-		if (value == nullptr)
-			throw new NameErrorException(valueStr);
-
-		if (value->shouldClone())
-			value = value->clone();
-	}
-	else if (isLegalFuncCall(valueStr))
-	{
-		value = callFunc(valueStr, varMap);
-		if (value == nullptr)
-			throw new NameErrorException(getFuncName(valueStr));
-	}
-	else
-	{
-		value = getType(valueStr);
-		if (value == nullptr)
-		{
-			if (isLegalComplex(valueStr))
-				value = calcComplex(valueStr, varMap);
-			else
-				throw new SyntaxException();
-		}
-	}
-	return value;
-}
-
 void Parser::freeMemory(std::unordered_map<std::string, Type*>* varMap)
 {
 	if (varMap == nullptr)
@@ -344,158 +216,318 @@ void Parser::freeMemory(std::unordered_map<std::string, Type*>* varMap)
 		delete x.second;
 }
 
-std::vector<Type*> Parser::stringToVector(const std::string &str, std::unordered_map<std::string, Type*>* varMap)
+Type* Parser::runCommand(TreeNode* commandTree, std::unordered_map<std::string, Type*>* varMap)
 {
-	std::vector<Type*> items;
-	std::vector<std::string> keyWords = getKeyWords(str);
-	for each (std::string keyWord in keyWords)
-		items.push_back(getValue(keyWord, varMap));
-	return items;
-}
-std::vector<std::string> Parser::getKeyWords(const std::string &str, char seperator)
-{
-	if (str == "")
-		return std::vector<std::string>();
-	char opener = NULL;
-	std::vector<std::string> keyWords;
-	std::string keyWordStr = "";
-	int last = 0;
-	for (unsigned int i = 0; i < str.size(); i++)
+	if (commandTree == nullptr)
+		throw new InterperterException();
+	Type *returnVal, *assignVal, *var, *index, *leftVal, *rightVal;
+ 	std::string curCmd = commandTree->getValue();
+	TreeNode *valTree, *varTree;
+	Sequence* varSeq;
+	std::vector<Type*> indexVec;
+	switch (curCmd.size())
 	{
-		if (opener == NULL)
+	case 1:
+		switch (curCmd[0])
 		{
-			if ((str[i] == seperator || (seperator == ' ' && str[i] == '\t')))
+		case '=':
+			if (commandTree->getChilds().size() != 2)
+				throw new InterperterException();
+			valTree = commandTree->getChildAt(1);
+			varTree = commandTree->getChildAt(0);
+			assignVal = runCommand(valTree);
+			
+			if (varTree->getValue() == "[]*") // if indexer assigner
 			{
-				if (!((seperator == ' ' || seperator == '\t') && last == i))
-				{
-					keyWordStr = str.substr(last, i - last);
-					Helper::trim(keyWordStr);
-					if (keyWordStr == "")
-						throw new SyntaxException();
-					keyWords.push_back(keyWordStr);
-				}
-				last = i + 1;
+				if (varTree->childCount() != 2)
+					throw new SyntaxException();
+				var = runCommand(varTree->getChildAt(0), varMap);
+				if (!var->isSequence())
+					throw new SyntaxException();
+				varSeq = (Sequence*)var;
+				index = runCommand(varTree->getChildAt(1), varMap);
+				varSeq->setAtIndex(index, assignVal);
+				return getTempVoid();
 			}
-			else if (str[i] == '\'' || str[i] == '"' || str[i] == '[' || str[i] == '(')
-				opener = str[i];
-		}
-		else if ((opener == '"' && str[i] == '"') || (opener == '\'' && str[i] == '\'') || (opener == '[' && str[i] == ']') || (opener == '(' && str[i] == ')'))
-			opener = NULL;
-	}
 
-	if (last == str.size() || opener != NULL)
-		throw new SyntaxException();
-
-	keyWordStr = str.substr(last);
-	Helper::trim(keyWordStr);
-	if (keyWordStr == "")
-		throw new SyntaxException();
-	keyWords.push_back(keyWordStr);
-
-	return keyWords;
-}
-std::vector<std::string> Parser::getComplexWords(const std::string &str)
-{
-	bool *legals = new bool[str.size()];
-	std::vector<std::string> keyWords;
-
-	for (int i = 0; i < str.size(); i++)
-	{
-		bool shouldCon = false;
-		if (i < str.size() - 1)
-		{
-			std::string temp = str.substr(i, 2);
-			for (std::string op : sizeTwoOps)
+			if (isLegalVarName(varTree->getValue()) && !varTree->hasChilds()) // if variable is valid
 			{
-				if (op == temp)
+				makeAssignment(varTree->getValue(), assignVal, varMap);
+				return getTempVoid();
+			}
+
+			throw new InterperterException();
+			break;
+		case '>':
+			if (commandTree->getChilds().size() != 2)
+				throw new SyntaxException();
+			leftVal = runCommand(commandTree->getChildAt(0), varMap);
+			rightVal = runCommand(commandTree->getChildAt(1), varMap);
+			return (*leftVal) > rightVal;
+			break;
+		case '<':
+			if (commandTree->getChilds().size() != 2)
+				throw new SyntaxException();
+			leftVal = runCommand(commandTree->getChildAt(0), varMap);
+			rightVal = runCommand(commandTree->getChildAt(1), varMap);
+			return (*leftVal) < rightVal;
+			break;
+		case '+':
+			if (commandTree->getChilds().size() != 2)
+				throw new SyntaxException();
+			leftVal = runCommand(commandTree->getChildAt(0), varMap);
+			rightVal = runCommand(commandTree->getChildAt(1), varMap);
+			return (*leftVal) + rightVal;
+			break;
+		case '-':
+			if (commandTree->getChilds().size() != 2)
+				throw new SyntaxException();
+			leftVal = runCommand(commandTree->getChildAt(0), varMap);
+			rightVal = runCommand(commandTree->getChildAt(1), varMap);
+			return (*leftVal) - rightVal;
+			break;
+		case '*':
+			if (commandTree->getChilds().size() != 2)
+				throw new SyntaxException();
+			leftVal = runCommand(commandTree->getChildAt(0), varMap);
+			rightVal = runCommand(commandTree->getChildAt(1), varMap);
+			return (*leftVal) * rightVal;
+			break;
+		case '/':
+			if (commandTree->getChilds().size() != 2)
+				throw new SyntaxException();
+			leftVal = runCommand(commandTree->getChildAt(0), varMap);
+			rightVal = runCommand(commandTree->getChildAt(1), varMap);
+			return (*leftVal) / rightVal;
+			break;
+		case '%':
+			if (commandTree->getChilds().size() != 2)
+				throw new SyntaxException();
+			leftVal = runCommand(commandTree->getChildAt(0), varMap);
+			rightVal = runCommand(commandTree->getChildAt(1), varMap);
+			return (*leftVal) % rightVal;
+			break;
+		case '!':
+			if (commandTree->getChilds().size() != 1)
+				throw new SyntaxException();
+			returnVal = runCommand(commandTree->getChildAt(0), varMap);
+			return !(*returnVal);
+			break;
+		default:
+			returnVal = getDefaultVal(curCmd, varMap);
+			if (returnVal == nullptr)
+				throw new SyntaxException();
+			return returnVal;
+			break;
+		}
+		break;
+	case 2:
+		if (curCmd[1] == '=')
+		{
+			if (curCmd[0] == '*' || curCmd[0] == '/' || curCmd[0] == '%' || curCmd[0] == '+' || curCmd[0] == '-')
+			{
+				if (commandTree->getChilds().size() != 2)
+					throw new SyntaxException();
+				valTree = commandTree->getChildAt(1);
+				varTree = commandTree->getChildAt(0);
+				assignVal = runCommand(varTree);
+				returnVal = runCommand(valTree);
+				switch (curCmd[0])
 				{
-					legals[i] = false;
-					legals[i + 1] = false;
-					i++;
-					shouldCon = true;
+				case '*':
+					assignVal = (*assignVal) * returnVal;
+					break;
+				case '/':
+					assignVal = (*assignVal) / returnVal;
+					break;
+				case '+':
+					assignVal = (*assignVal) + returnVal;
+					break;
+				case '-':
+					assignVal = (*assignVal) - returnVal;
+					break;
+				case '%':
+					assignVal = (*assignVal) % returnVal;
+					break;
+				}
+				if (varTree->getValue() == "[]*") // if indexer assigner
+				{
+					if (varTree->childCount() != 2)
+						throw new SyntaxException();
+					var = runCommand(varTree->getChildAt(0), varMap);
+					if (!var->isSequence())
+						throw new SyntaxException();
+					varSeq = (Sequence*)var;
+					index = runCommand(varTree->getChildAt(1), varMap);
+					varSeq->setAtIndex(index, assignVal);
+					return getTempVoid();
+				}
+				if (isLegalVarName(varTree->getValue()) && !varTree->hasChilds()) // if variable is valid
+				{
+					makeAssignment(varTree->getValue(), assignVal, varMap);
+					return getTempVoid();
+				}
+
+				throw new InterperterException();
+			}
+			else if (curCmd[0] == '=' || curCmd[0] == '!' || curCmd[0] == '>' || curCmd[0] == '<')
+			{
+				if (commandTree->getChilds().size() != 2)
+					throw new InterperterException();
+				leftVal = runCommand(commandTree->getChildAt(0), varMap);
+				rightVal = runCommand(commandTree->getChildAt(1), varMap);
+				switch (curCmd[0])
+				{
+				case '=':
+					return (*leftVal) == rightVal;
+					break;
+				case '!':
+					return (*leftVal) != rightVal;
+					break;
+				case '>':
+					return (*leftVal) >= rightVal;
+					break;
+				case '<':
+					return (*leftVal) <= rightVal;
 					break;
 				}
 			}
-			if (shouldCon)
-				continue;
-		}
-		if (str[i] == '\"')
-		{
-			int last = i;
-			legals[i++] = true;
-			while (str[i] != '\"' && i <str.size())
-				legals[i++] = true;
-			legals[i] = true;
-			continue;
-		}
-		if (str[i] == '\'')
-		{
-			int last = i;
-			legals[i++] = true;
-			while (str[i] != '\'' && i <str.size())
-				legals[i++] = true;
-			legals[i] = true;
-			continue;
-		}
-		for (char op : sizeOneOps)
-		{
-			if (op == str[i])
+			else
 			{
-				legals[i] = false;
-				shouldCon = true;
-				break;
+				throw new SyntaxException();
 			}
 		}
-		if (shouldCon)
-			continue;
-		for (char op : legalComplex)
+		else if (curCmd == "||")
 		{
-			if (op == str[i])
+			if (commandTree->getChilds().size() != 2)
+				throw new InterperterException();
+			leftVal = runCommand(commandTree->getChildAt(0), varMap);
+			rightVal = runCommand(commandTree->getChildAt(1), varMap);
+			return (*leftVal) || rightVal;
+		}
+		else if (curCmd == "&&")
+		{
+			if (commandTree->getChilds().size() != 2)
+				throw new InterperterException();
+			leftVal = runCommand(commandTree->getChildAt(0), varMap);
+			rightVal = runCommand(commandTree->getChildAt(1), varMap);
+			return (*leftVal) && rightVal;
+		}
+		else if (curCmd == "[]") // list
+		{
+			returnVal = new List();
+			for each (auto child in commandTree->getChilds())
 			{
-				legals[i] = false;
-				shouldCon = true;
-				break;
+				if (child == nullptr)
+					throw new SyntaxException();
+				((List*)returnVal)->push(runCommand(child, varMap));
 			}
+			return returnVal;
 		}
-		if (shouldCon)
-			continue;
-		legals[i] = (str[i] != ' ');
-	}
-	int last = 0;
-	int i = 0;
-	for (i; i < str.size(); i++)
-	{
-		if (legals[i])
+		else if (curCmd == "()") // function call
 		{
-			if (!legals[last])
-				last = i;
-			continue;
+			if (commandTree->getChilds().size() != 2)
+				throw new InterperterException();
+			leftVal = runCommand(commandTree->getChildAt(0), varMap); // function name
+			rightVal = runCommand(commandTree->getChildAt(1), varMap); // parameters
+			if (leftVal->getTypeName() != ClassType::FunctionC)
+				throw new SyntaxException();
+			if (rightVal->getTypeName() != ClassType::ListC)
+				throw new SyntaxException();
+			return ((Function*)leftVal)->run(((List*)rightVal)->getValue());
 		}
-		if (legals[last])
+		else if (curCmd == "{}") // dictionary
 		{
-			keyWords.push_back(str.substr(last, i - last));
+			throw new SyntaxException(); // should creare a dictionary instead
 		}
-			
-		last = i;
+		else
+		{
+			returnVal = getDefaultVal(curCmd, varMap);
+			if (returnVal == nullptr)
+				throw new SyntaxException();
+			return returnVal;
+		}
+		break;
+	default:
+		if (curCmd == "[]*")
+		{
+			if (commandTree->childCount() != 2)
+				throw new SyntaxException();
+			var = runCommand(commandTree->getChildAt(0), varMap);
+			if (!var->isSequence())
+				throw new SyntaxException();
+			varSeq = (Sequence*)var;
+			indexVec = getIndexRange(commandTree->getChildAt(1), varMap);
+			return (*varSeq)[indexVec];
+		}
+		returnVal = getDefaultVal(curCmd, varMap);
+		if (returnVal == nullptr)
+			throw new SyntaxException();
+		return returnVal;
+		break;
 	}
-	if (last != i - 1 && legals[last])
-	{
-		keyWords.push_back(str.substr(last, i - last));
-	}
-	return keyWords;
 }
 
-TreeNode* Parser::getComplexTree(std::string &str)
+Type* Parser::getDefaultVal(std::string& str, std::unordered_map<std::string, Type*>* varMap)
+{
+	// check if current string is a variable
+	if (isLegalVarName(str))
+		return getVariableValue(str, varMap);
+	// check if current command is a raw simple 
+	if (isLegalType(str))
+		return getType(str, varMap);
+	return nullptr;
+}
+
+std::vector<Type*> Parser::getIndexRange(TreeNode* indexTree, std::unordered_map<std::string, Type*>* varMap)
+{
+	std::vector<Type*> indexVec;
+	indexRangeRecursive(indexTree, indexVec, varMap);
+	return indexVec;
+}
+void Parser::indexRangeRecursive(TreeNode* indexTree, std::vector<Type*>& indexVec, std::unordered_map<std::string, Type*>* varMap)
+{
+	if (indexTree == nullptr)
+	{
+		indexVec.push_back(getTempVoid());
+		return;
+	}
+	std::string curCmd = indexTree->getValue();
+	if (curCmd == ":")
+	{
+		indexRangeRecursive(indexTree->getChildAt(0), indexVec, varMap);
+		indexRangeRecursive(indexTree->getChildAt(1), indexVec, varMap);
+	}
+	else if (curCmd == "")
+		indexVec.push_back(getTempVoid());
+	else
+		indexVec.push_back(runCommand(indexTree, varMap));
+}
+
+Void* Parser::getTempVoid()
+{
+	Void* temp = new Void();
+	temp->setIsTemp(true);
+	return temp;
+}
+
+TreeNode* Parser::getComplexTree(const std::string &str)
 {
 	if (str == "")
 		return nullptr;
 	// check if all string is between parentheses
-	if (str[0] == '(' && findCloser({ '(', ')' }, str, 1) == str.size() - 1)
-		return getComplexTree(str.substr(1, str.size() - 1));
+	if (str[0] == '(' && findCloser('(', ')', str, 1) == str.size() - 1)
+		return getComplexTree(str.substr(1, str.size() - 2));
+	// check if current string is a list
+	if (str[0] == '[' && findCloser('[', ']', str, 1) == str.size() - 1)
+		return getInsideTree(str.substr(1, str.size() - 2), std::string("[]"));
+	// check if current string is a dictionary
+	if (str[0] == '{' && findCloser('{', '}', str, 1) == str.size() - 1)
+		return getInsideTree(str.substr(1, str.size() - 2), std::string("{}"));
 	// check for openers and closers inside the code
 	auto insideRange = findInsideRange(str);
 	int i, vecIdx;
-	// check for assigners
+	// check for assigners and for ':' seprator
 	for (i = str.size() - 1, vecIdx = insideRange.size() - 1; i >= 0; i--)
 	{
 		if (str[i] == '=')
@@ -507,11 +539,13 @@ TreeNode* Parser::getComplexTree(std::string &str)
 					i -= 1;
 					continue;
 				}
-				if (str[i - 1] == '*' || str[i - 1] == '/' || str[i - 1] == '+' || str[i - 1] == '-')
+				if (str[i - 1] == '*' || str[i - 1] == '/' || str[i - 1] == '+' || str[i - 1] == '-' || str[i - 1] == '%')
 					return new TreeNode(str.substr(i - 1, 2), getComplexTree(str.substr(0, i - 1)), getComplexTree(str.substr(i + 1, str.size() - i - 1)));
 			}
 			return new TreeNode("=", getComplexTree(str.substr(0, i)), getComplexTree(str.substr(i + 1, str.size() - i - 1)));
 		}
+		if (str[i] == ':')
+			return new TreeNode(":", getComplexTree(str.substr(0, i)), getComplexTree(str.substr(i + 1, str.size() - i - 1)));
 		if (vecIdx >= 0 && insideRange[vecIdx].second.second == i)
 			i = insideRange[vecIdx--].second.first;
 	}
@@ -541,18 +575,27 @@ TreeNode* Parser::getComplexTree(std::string &str)
 		if (vecIdx >= 0 && insideRange[vecIdx].second.second == i)
 			i = insideRange[vecIdx--].second.first;
 	}
-	// check for indexers
+	// check for indexers and function calls
 	for (i = insideRange.size() - 1; i >= 0; i--)
 	{
 		auto curRange = insideRange[i];
-		if (curRange.first == '[' && curRange.second.first != 0)
+		if (curRange.second.first != 0)
 		{
-			if (curRange.second.second == str.size() - 1)
-				return new TreeNode(std::string("[]"), getComplexTree(str.substr(0, curRange.second.first)), getComplexTree(str.substr(curRange.second.first + 1, curRange.second.second - curRange.second.first - 2)));
-			else
-				throw new InterperterException();
+			if (curRange.first == '[')
+			{
+				if (curRange.second.second == str.size() - 1)
+					return new TreeNode(std::string("[]*"), getComplexTree(str.substr(0, curRange.second.first)), getComplexTree(str.substr(curRange.second.first + 1, curRange.second.second - curRange.second.first - 1)));
+				else
+					throw new InterperterException();
+			}
+			if (curRange.first == '(')
+			{
+				if (curRange.second.second == str.size() - 1)
+					return new TreeNode(std::string("()"), getComplexTree(str.substr(0, curRange.second.first)), getInsideTree(str.substr(curRange.second.first + 1, curRange.second.second - curRange.second.first - 1), std::string("[]")));
+				else
+					throw new InterperterException();
+			}
 		}
-		
 	}
 	// check for ! (not sign)
 	for (i = str.size() - 1, vecIdx = insideRange.size() - 1; i >= 0; i--)
@@ -562,41 +605,40 @@ TreeNode* Parser::getComplexTree(std::string &str)
 		if (vecIdx >= 0 && insideRange[vecIdx].second.second == i)
 			i = insideRange[vecIdx--].second.first;
 	}
+	// check if variable or raw value
+	if (isLegalVarName(str) || isLegalType(str))
+		return new TreeNode(str);
+
+	throw new InterperterException();
 }
 
-TreeNode* Parser::getInsideTree(std::string &str, std::string &val)
+TreeNode* Parser::getInsideTree(const std::string &str, const std::string &val)
 {
 	TreeNode* curTree = new TreeNode(val);
 	if (str == "")
-		curTree;
-	// check if all string is between parentheses
-	if (str[0] == '(' && findCloser({ '(', ')' }, str, 1) == str.size() - 1)
-	{
-		curTree->pushChild(getComplexTree(str.substr(1, str.size() - 1)));
 		return curTree;
-	}
 	// check for openers and closers inside the code
 	auto insideRange = findInsideRange(str);
 	int i, vecIdx, last;
 	last = 0;
 	//check for coma(,)
-	for (i = str.size() - 1, vecIdx = insideRange.size() - 1; i > 0; i--)
+	for (i = 0, vecIdx = 0; i < str.size(); i++)
 	{
 		if (str[i] == ',')
 		{
-			if (i >= last)
+			if (i == last)
 				throw new InterperterException();
 			curTree->pushChild(getComplexTree(str.substr(last, i - last)));
-			last = i + 1;
+			last = i+1;
 		}
-		if (vecIdx >= 0 && insideRange[vecIdx].second.second == i)
-			i = insideRange[vecIdx--].second.first;
+		else if (vecIdx < insideRange.size() && insideRange[vecIdx].second.first == i)
+			i = insideRange[vecIdx++].second.second;
 	}
-	curTree->pushChild(getComplexTree(str.substr(last, str- last)));
-	last = i + 1;
+	curTree->pushChild(getComplexTree(str.substr(last, str.size() - last)));
+	return curTree;
 }
 
-std::vector<std::pair<char, std::pair<int, int>>> Parser::findInsideRange(std::string &str)
+std::vector<std::pair<char, std::pair<int, int>>> Parser::findInsideRange(const std::string &str)
 {
 	std::vector<std::pair<char, std::pair<int, int>>> insideRange;
 	int opener, closer;
@@ -674,233 +716,48 @@ int Parser::findCloser(char opener, char closer, const std::string &str, int pos
 	return -1;
 }
 
-void Parser::makeAssignment(const std::string& str, std::unordered_map<std::string, Type*>* localVarMap)
+void Parser::makeAssignment(const std::string& varName, Type* assignVal, std::unordered_map<std::string, Type*>* localVarMap)
 {
-	int equSign = str.find_first_of('=');
-
-	std::string varName = str.substr(0, equSign);
-	std::string valueStr = str.substr(equSign + 1);
-
-	Helper::rtrim(varName);
-	Helper::ltrim(valueStr);
-
-	Type* value = getValue(valueStr, localVarMap);
-
 	Type* varP = getVariableValue(varName);
 	if (varP == nullptr && localVarMap != nullptr)
-		(*localVarMap)[varName] = value;
+		(*localVarMap)[varName] = assignVal;
 	else
-		_variables[varName] = value;
+		_variables[varName] = assignVal;
 }
-void Parser::assignReturnValue(const std::string& str, std::unordered_map<std::string, Type*>* localVarMap)
-{
-	(*localVarMap)["return"] = getValue(str.substr(str.find_first_of(" \t") + 1), localVarMap);
-}
+
 Function* Parser::assignFunc(const std::string &str)
 {
-	std::vector<std::string> keyWords = getKeyWords(str, ' ');
-	std::vector<std::string> parametersNames;
-	std::string funcName, parametersStr;
-	std::size_t lBracket, rBracket, opener;
-
-	if (keyWords[0] != "def")
-		return nullptr;
-
-	while (keyWords.size() > 2)
-	{
-		keyWords[keyWords.size() - 2] += keyWords[keyWords.size() - 1];
-		keyWords.pop_back();
-	}
-
-	lBracket = keyWords[1].find_first_of('(');
-	rBracket = keyWords[1].find_last_of(')');
-	opener = keyWords[1].find_first_of(':');
-
-	if (lBracket == std::string::npos || lBracket == std::string::npos ||  opener != keyWords[1].size() - 1)
+	
+	TreeNode* AssignTree = getComplexTree(str);
+	if (AssignTree == nullptr || AssignTree->getValue() != ":")
 		throw new SyntaxException();
-
-	if (keyWords[1].find_first_not_of({ ' ', '\t' }, rBracket + 1) != opener)
+	if (AssignTree->getChildAt(1) != nullptr && AssignTree->getChildAt(1)->getValue() != "")
 		throw new SyntaxException();
-
-	parametersStr = keyWords[1].substr(lBracket + 1, rBracket - lBracket - 1);
-	funcName = keyWords[1].substr(0, lBracket);
-
+	TreeNode* funcTree = AssignTree->getChildAt(0);
+	if (funcTree == nullptr || funcTree->getValue() != "()")
+		throw new SyntaxException();
+	if (funcTree->getChildAt(0) == nullptr || funcTree->getChildAt(0)->childCount() != 0)
+		throw new SyntaxException();
+	std::string funcName = funcTree->getChildAt(0)->getValue();
 	if (!isLegalVarName(funcName))
 		throw new SyntaxException();
-
-	if (parametersStr.size() != 0)
+	if (getVariableValue(funcName) != nullptr)
+		throw new SyntaxException(); // should be a reassign exception
+	std::vector<std::string> parametersNames;
+	TreeNode* paramTree = funcTree->getChildAt(1);
+	if (paramTree == nullptr || paramTree->getValue() != "[]")
+		throw new SyntaxException();
+	for each (auto parameter in paramTree->getChilds())
 	{
-		parametersNames = getKeyWords(parametersStr);
-		for each (std::string paramName in parametersNames)
-			if (!isLegalVarName(paramName))
-				throw new SyntaxException();
+		if (parameter == nullptr)
+			throw new SyntaxException();
+		if (parameter->childCount() != 0) // should change it when I add default value to parameters
+			throw new SyntaxException();
+		std::string parameterName = parameter->getValue();
+		if (parameterName == "" || !isLegalVarName(parameterName))
+			throw new SyntaxException();
+		parametersNames.push_back(parameterName);
 	}
-
 	_variables[funcName] = new Function(parametersNames);
 	return (Function*)(_variables[funcName]);
-}
-
-std::string Parser::getFuncName(const std::string& str)
-{
-	std::size_t lBracket = str.find_first_of('(');
-	return str.substr(0, lBracket);
-}
-
-Type* Parser::callFunc(const std::string &str, std::unordered_map<std::string, Type*>* localVarMap)
-{
-	std::size_t lBracket, rBracket;
-	lBracket = str.find_first_of('(');
-	rBracket = str.find_last_of(')');
-	std::string funcName = str.substr(0, lBracket);
-	std::string parametersStr = str.substr(lBracket + 1, rBracket - lBracket - 1);
-
-	Type* Func = getVariableValue(funcName, localVarMap);
-
-	if (Func == nullptr || Func->getTypeName() != ClassType::FunctionC)
-		return nullptr;
-
-	std::vector<Type*> parameters = stringToVector(parametersStr, localVarMap);
-
-	return ((Function*)Func)->run(parameters);
-}
-
-Type* Parser::calcComplex(const std::string& str, std::unordered_map<std::string, Type*>* localVarMap)
-{
-	Type* returnVal = createTree(str, localVarMap)->calcTree();
-	if (returnVal == nullptr)
-		throw new SyntaxException();
-	return returnVal;
-}
-BinTreeNode* Parser::createTree(const std::string& str, std::unordered_map<std::string, Type*>* localVarMap)
-{
-	std::string cleanStr = str;
-	Helper::trim(cleanStr);
-	Type* value;
-	int strSize = cleanStr.size();
-	if (cleanStr == "")
-	{
-		throw new SyntaxException();
-	}
-	if (cleanStr[0] == '(' && cleanStr[strSize - 1] == ')')
-		return createTree(cleanStr.substr(1, strSize - 2), localVarMap);
-	else if (isLegalVarName(cleanStr))
-	{
-		value = getVariableValue(cleanStr, localVarMap);
-
-		if (value == nullptr)
-			throw new NameErrorException(cleanStr);
-	}
-	else if ((value = getType(cleanStr)) != nullptr){}
-	else if (isLegalFuncCall(cleanStr))
-	{
-		value = callFunc(cleanStr, localVarMap);
-		if (value == nullptr)
-			throw new NameErrorException(getFuncName(cleanStr));
-	}
-	else
-	{
-		std::vector<std::pair<int, int>> untouchedRanges;
-		for (int i = strSize - 1; i >= 0; i--)
-		{
-			int left = strSize;
-			switch (cleanStr[i])
-			{
-			case '\'':
-			case '\"':
-				left = cleanStr.find_last_of(cleanStr[i], i - 1);
-				break;
-			case ')':
-				left = cleanStr.find_last_of('(', i - 1);
-				break;
-			case '[':
-				left = cleanStr.find_last_of(']', i - 1);
-				break;
-			default:
-				break;
-			}
-			if (left == std::string::npos)
-				throw new SyntaxException();
-			else if (left != strSize)
-			{
-				untouchedRanges.push_back(std::pair<int, int>(left, i));
-				i = left;
-			}
-		}
-		int rangeIdx = 0;
-		// first rate operators = *, /, %
-		for (int i = strSize - 1; i >= 0; i--)
-		{
-			if (rangeIdx < untouchedRanges.size())
-			{
-				if (i == untouchedRanges[rangeIdx].second)
-				{
-					i = untouchedRanges[rangeIdx++].first;
-					continue;
-				}
-			}
-			if (cleanStr[i] == '*' || cleanStr[i] == '/' || cleanStr[i] == '%')
-			{
-				Operand* myOp = new Operand((OperandType)cleanStr[i]);
-				BinTreeNode* left = createTree(cleanStr.substr(0, i), localVarMap);
-				BinTreeNode* right = createTree(cleanStr.substr(i + 1), localVarMap);
-				return new BinTreeNode(myOp, left, right);
-			}
-		}
-		// second rate operators = +, -
-		rangeIdx = 0;
-		for (int i = strSize - 1; i >= 0; i--)
-		{
-			if (rangeIdx < untouchedRanges.size())
-			{
-				if (i == untouchedRanges[rangeIdx].second)
-				{
-					i = untouchedRanges[rangeIdx++].first;
-					continue;
-				}
-			}
-			if (cleanStr[i] == '+' || cleanStr[i] == '-')
-			{
-				Operand* myOp = new Operand((OperandType)cleanStr[i]);
-				BinTreeNode* left = createTree(cleanStr.substr(0, i), localVarMap);
-				BinTreeNode* right = createTree(cleanStr.substr(i + 1), localVarMap);
-				return new BinTreeNode(myOp, left, right);
-			}
-		}
-		// comparsion opreators
-		rangeIdx = 0;
-		for (int i = strSize - 1; i >= 0; i--)
-		{
-			if (rangeIdx < untouchedRanges.size())
-			{
-				if (i == untouchedRanges[rangeIdx].second)
-				{
-					i = untouchedRanges[rangeIdx++].first;
-					continue;
-				}
-			}
-			if (i != 0)
-			{
-				std::string temp = cleanStr.substr(i - 1, 2);
-				for (std::string op : sizeTwoOps)
-				{
-					if (op == temp)
-					{
-						Operand* myOp = new Operand((OperandType)(op[0] * op[1] % 256));
-						BinTreeNode* left = createTree(cleanStr.substr(0, i - 1), localVarMap);
-						BinTreeNode* right = createTree(cleanStr.substr(i + 1), localVarMap);
-						return new BinTreeNode(myOp, left, right);
-					}
-				}
-			}
-			if (cleanStr[i] == '>' || cleanStr[i] == '<')
-			{
-				Operand* myOp = new Operand((OperandType)cleanStr[i]);
-				BinTreeNode* left = createTree(cleanStr.substr(0, i), localVarMap);
-				BinTreeNode* right = createTree(cleanStr.substr(i + 1), localVarMap);
-				return new BinTreeNode(myOp, left, right);
-			}
-			
-		}
-	}
-	return new BinTreeNode(value);
 }

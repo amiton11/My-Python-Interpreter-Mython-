@@ -1,7 +1,7 @@
 #ifndef FLOAT_H
 #define FLOAT_H
 
-#include "type.h"
+#include "Type.h"
 #include "Boolean.h"
 
 class Float : public Type

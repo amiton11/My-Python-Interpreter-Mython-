@@ -1,7 +1,7 @@
 #ifndef VOID_H
 #define VOID_H
 
-#include "type.h"
+#include "Type.h"
 
 class Void : public Type
 {

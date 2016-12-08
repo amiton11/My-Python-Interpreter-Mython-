@@ -16,7 +16,7 @@ public:
 	std::vector<Type*> getValue() const;
 	void setValue(std::vector<Type*> value);
 
-	Type* operator[] (Type* index) const;
+	Type* operator[] (std::vector<Type*> index) const;
 	void setAtIndex(Type* index, Type* value);
 
 	void push(Type*);
@@ -27,6 +27,8 @@ public:
 
 	Type* operator+(Type*);
 	Type* operator*(Type*);
+
+	int getFixedIndex(int index) const;
 
 	operator bool();
 	operator std::string();

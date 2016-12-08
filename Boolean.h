@@ -1,7 +1,7 @@
 #ifndef BOOLEAN_H
 #define BOOLEAN_H
 
-#include "type.h"
+#include "Type.h"
 
 class Boolean : public Type
 {

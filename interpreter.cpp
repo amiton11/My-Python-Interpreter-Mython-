@@ -1,4 +1,4 @@
-#include "type.h"
+#include "Type.h"
 #include "InterperterException.h"
 #include "IndentationException.h"
 #include "parser.h"

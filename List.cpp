@@ -3,7 +3,13 @@
 
 List::List(std::vector<Type*> value) : List()
 {
-	_value = value;
+	for (int i = 0; i < value.size(); i++)
+	{
+		if (value[i]->shouldClone())
+			_value.push_back(value[i]->clone());
+		else
+			_value.push_back(value[i]);
+	}
 }
 List::List()
 {
@@ -23,25 +29,60 @@ void List::setValue(std::vector<Type*> value)
 {
 	_value = value;
 }
-Type* List::operator[] (Type* index) const
+Type* List::operator[] (std::vector<Type*> index) const
 {
-	if (_value.empty())
-		return nullptr;
-	int i = (int)(*index);
-	i = i % _value.size();
-	if (i < 0)
-		i += _value.size();
-	return _value[i];
+	std::vector<Type*> newList;
+	int start = 0, end = _value.size(), step = 1, i;
+	switch (index.size())
+	{
+	case 1:
+		i = getFixedIndex((int)(*index[0]));
+		if (_value[i]->shouldClone())
+			return _value[i]->clone();
+		return _value[i];
+		break;
+	case 2:
+		if (index[0]->getTypeName() != ClassType::VoidC)
+			start = getFixedIndex((int)(*index[0]));
+		if (index[1]->getTypeName() != ClassType::VoidC)
+			end = getFixedIndex((int)(*index[1]));
+		return new List(std::vector<Type*>(_value.begin() + start, _value.begin() + end));
+		break;
+	case 3:
+		if (index[0]->getTypeName() != ClassType::VoidC)
+			start = getFixedIndex((int)(*index[0]));
+		if (index[1]->getTypeName() != ClassType::VoidC)
+			end = getFixedIndex((int)(*index[1]));
+		if (index[2]->getTypeName() != ClassType::VoidC)
+			step = (int)(*index[2]);
+		while (start < end)
+		{
+			if (_value[start]->shouldClone())
+				newList.push_back(_value[start]->clone());
+			else
+				newList.push_back(_value[start]);
+			start += step;
+		}
+		return new List(newList);
+		break;
+	default:
+		throw new InterperterException(); // should be an index exception
+		break;
+	}
 }
 void List::setAtIndex(Type* index, Type* item)
 {
-	if (_value.empty())
-		return;
-	int i = (int)(*index);
-	i = i % _value.size();
-	if (i < 0)
-		i += _value.size();
+	int i = getFixedIndex((int)(*index));
 	_value[i] = item;
+}
+
+int List::getFixedIndex(int index) const
+{
+	if (index < 0)
+		index += _value.size();
+	if (index < 0 || index > _value.size() - 1)
+		throw new InterperterException(); // should be an index error;
+	return index;
 }
 
 void List::push(Type* item)

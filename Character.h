@@ -1,7 +1,7 @@
 #ifndef CHARACTER_H
 #define CHARACTER_H
 
-#include "type.h"
+#include "Type.h"
 #include "Boolean.h"
 
 class Character : public Type

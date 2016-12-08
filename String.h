@@ -14,12 +14,14 @@ public:
 	std::string getValue() const;
 	void setValue(std::string value);
 
-	Type* operator[] (Type* index) const;
+	Type* operator[] (std::vector<Type*> index) const;
 	void setAtIndex(Type* index, Type* value);
 
 	bool isPrintable() const;
 	std::string toString() const;
 	Type* clone() const;
+
+	int getFixedIndex(int index) const;
 
 	operator bool();
 	operator std::string();
