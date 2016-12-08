@@ -49,6 +49,14 @@ private:
 	static std::vector<std::string> getKeyWords(const std::string &str, char seperator=',');
 	static std::vector<std::string> getComplexWords(const std::string &str);
 
+	static TreeNode* getComplexTree(std::string &str);
+	static TreeNode* getInsideTree(std::string &str, std::string &val);
+
+	static int findCloser(std::pair<const char, const char> openerAndCloser, const std::string &str, int pos = 0);
+	static int findCloser(char opener, char closer, const std::string &str, int pos = 0);
+	
+	static std::vector<std::pair<char, std::pair<int, int>>> findInsideRange(std::string &str);
+
 	/*static Type* getValueAtIndex(const std::string &str, std::unordered_map<std::string, Type*>* localVarMap = nullptr);
 	static void setValueAtIndex(const std::string &str, Type* val, std::unordered_map<std::string, Type*>* localVarMap = nullptr);
 	static std::pair<Type*, Type*> getVarAndIndx(const std::string &str, std::unordered_map<std::string, Type*>* localVarMap = nullptr);
