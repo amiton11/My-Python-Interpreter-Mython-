@@ -1,7 +1,6 @@
 #include "Float.h"
 #include "Helper.h"
-#include <string> 
-#include <math.h>
+#include <string>
 
 Float::Float(double value)
 {

@@ -84,7 +84,7 @@ bool Function::parseInto()
 		std::cout << ">>> ";
 		std::getline(std::cin, input_string);
 	}
-	if (input_string != "")
+	if (input_string != "") // if user wrote new line that doesn't belong to the fucntion -> run it like a regular line
 	{
 		try
 		{

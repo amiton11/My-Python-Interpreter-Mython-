@@ -33,6 +33,8 @@ public:
 	void pushChild(TreeNode* child);
 
 	void reverseChild();
+
+	void printTree();
 };
 
 #endif // TREE_NODE_H

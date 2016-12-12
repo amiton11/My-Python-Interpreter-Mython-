@@ -3,6 +3,7 @@
 
 #include "Type.h"
 #include "Boolean.h"
+#include <math.h>
 
 class Float : public Type
 {

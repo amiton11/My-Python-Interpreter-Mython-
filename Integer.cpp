@@ -1,4 +1,5 @@
 #include "Integer.h"
+#include "Float.h"
 #include <string> 
 
 Integer::Integer(int value)
@@ -49,57 +50,106 @@ Integer::operator double()
 
 Type* Integer::operator+(Type* other)
 {
-	return new Integer(_value + (int)(*other));
+	if (other->getTypeName() == ClassType::FloatC)
+		return new Float((double)_value + (double)(*other));
+	else
+		return new Integer(_value + (int)(*other));
 }
 Type* Integer::operator-(Type* other)
 {
-	return new Integer(_value - (int)(*other));
+	if (other->getTypeName() == ClassType::FloatC)
+		return new Float((double)_value - (double)(*other));
+	else
+		return new Integer(_value - (int)(*other));
 }
 Type* Integer::operator*(Type* other)
 {
-	return new Integer(_value * (int)(*other));
+	if (other->getTypeName() == ClassType::FloatC)
+		return new Float((double)_value * (double)(*other));
+	else
+		return new Integer(_value * (int)(*other));
 }
 Type* Integer::operator/(Type* other)
 {
-	return new Integer(_value / (int)(*other));
+	if (other->getTypeName() == ClassType::FloatC)
+	{
+		if ((double)(*other) == 0.0)
+			throw new InterperterException(); // should be a division by zero exception
+		return new Float((double)_value / (double)(*other));
+	}
+	else
+	{
+		if ((int)(*other) == 0)
+			throw new InterperterException(); // should be a division by zero exception
+		return new Integer(_value / (int)(*other));
+	}
 }
 Type* Integer::operator%(Type* other)
 {
-	return new Integer(_value % (int)(*other));
+	if (other->getTypeName() == ClassType::FloatC)
+	{
+		if ((double)(*other) == 0.0)
+			throw new InterperterException(); // should be a division by zero exception
+		return new Float(fmod((double)_value, (double)(*other)));
+	}
+	else
+	{
+		if ((int)(*other) == 0)
+			throw new InterperterException(); // should be a division by zero exception
+		return new Integer(_value / (int)(*other));
+	}
 }
 Type* Integer::operator==(Type* other)
 {
 	if (other->getTypeName() == ClassType::BooleanC)
 		return (*(Boolean*)other) == this;
-	return new Boolean(_value == (int)(*other));
+	else if (other->getTypeName() == ClassType::FloatC)
+		return new Float((double)_value == (double)(*other));
+	else
+		return new Integer(_value == (int)(*other));
 }
 Type* Integer::operator!=(Type* other)
 {
 	if (other->getTypeName() == ClassType::BooleanC)
 		return (*(Boolean*)other) != this;
-	return new Boolean(_value != (int)(*other));
+	else if (other->getTypeName() == ClassType::FloatC)
+		return new Float((double)_value != (double)(*other));
+	else
+		return new Integer(_value != (int)(*other));
 }
 Type* Integer::operator>(Type* other)
 {
 	if (other->getTypeName() == ClassType::BooleanC)
 		return (*(Boolean*)other) < this;
-	return new Boolean(_value > (int)(*other));
+	else if (other->getTypeName() == ClassType::FloatC)
+		return new Float((double)_value > (double)(*other));
+	else
+		return new Integer(_value > (int)(*other));
 }
 Type* Integer::operator<(Type* other)
 {
 	if (other->getTypeName() == ClassType::BooleanC)
 		return (*(Boolean*)other) > this;
-	return new Boolean(_value < (int)(*other));
+	else if (other->getTypeName() == ClassType::FloatC)
+		return new Float((double)_value < (double)(*other));
+	else
+		return new Integer(_value < (int)(*other));
 }
 Type* Integer::operator>=(Type* other)
 {
 	if (other->getTypeName() == ClassType::BooleanC)
 		return (*(Boolean*)other) <= this;
-	return new Boolean(_value >= (int)(*other));
+	else if (other->getTypeName() == ClassType::FloatC)
+		return new Float((double)_value >= (double)(*other));
+	else
+		return new Integer(_value >= (int)(*other));
 }
 Type* Integer::operator<=(Type* other)
 {
 	if (other->getTypeName() == ClassType::BooleanC)
 		return (*(Boolean*)other) >= this;
-	return new Boolean(_value <= (int)(*other));
+	else if (other->getTypeName() == ClassType::FloatC)
+		return new Float((double)_value <= (double)(*other));
+	else
+		return new Integer(_value <= (int)(*other));
 }

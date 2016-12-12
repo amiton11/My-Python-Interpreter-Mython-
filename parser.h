@@ -28,10 +28,11 @@ class Parser
 	friend class Function;
 public:
 	static Type* parseString(std::string str) throw();
-	static Type* getType(const std::string &str, std::unordered_map<std::string, Type*>* localVarMap = nullptr);
 	static void freeMemory(std::unordered_map<std::string, Type*>* varMap = nullptr);
 	
 private:
+
+	static Type* getType(const std::string &str);
 
 	static bool isLegalFuncAssign(const std::string& str);
 	static bool isLegalVarName(const std::string& str);

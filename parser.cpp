@@ -124,7 +124,7 @@ std::string Parser::getCleanStr(std::string &str)
 	return cleanStr;
 }
 
-Type* Parser::getType(const std::string &str, std::unordered_map<std::string, Type*>* localVarMap)
+Type* Parser::getType(const std::string &str)
 {
 	Type* returnVal = nullptr;
 	if (Helper::isInteger(str))
@@ -150,7 +150,6 @@ Type* Parser::getType(const std::string &str, std::unordered_map<std::string, Ty
 	return returnVal;
 }
 
-
 bool Parser::isLegalVarName(const std::string& str)
 {
 	if (!(Helper::isLetter(str[0]) || Helper::isUnderscore(str[0])))
@@ -168,6 +167,8 @@ bool Parser::isLegalVarName(const std::string& str)
 }
 bool Parser::isLegalType(const std::string& str)
 {
+	if (str.size() == 0)
+		return false;
 	if (Helper::isInteger(str) || Helper::isBoolean(str) || Helper::isString(str) || Float::isFloat(str))
 		return true;
 	return false;
@@ -235,7 +236,7 @@ Type* Parser::runCommand(TreeNode* commandTree, std::unordered_map<std::string, 
 				throw new InterperterException();
 			valTree = commandTree->getChildAt(1);
 			varTree = commandTree->getChildAt(0);
-			assignVal = runCommand(valTree);
+			assignVal = runCommand(valTree, varMap);
 			
 			if (varTree->getValue() == "[]*") // if indexer assigner
 			{
@@ -330,8 +331,8 @@ Type* Parser::runCommand(TreeNode* commandTree, std::unordered_map<std::string, 
 					throw new SyntaxException();
 				valTree = commandTree->getChildAt(1);
 				varTree = commandTree->getChildAt(0);
-				assignVal = runCommand(varTree);
-				returnVal = runCommand(valTree);
+				assignVal = runCommand(varTree, varMap);
+				returnVal = runCommand(valTree, varMap);
 				switch (curCmd[0])
 				{
 				case '*':
@@ -475,7 +476,7 @@ Type* Parser::getDefaultVal(std::string& str, std::unordered_map<std::string, Ty
 		return getVariableValue(str, varMap);
 	// check if current command is a raw simple 
 	if (isLegalType(str))
-		return getType(str, varMap);
+		return getType(str);
 	return nullptr;
 }
 
@@ -563,7 +564,12 @@ TreeNode* Parser::getComplexTree(const std::string &str)
 	for (i = str.size() - 1, vecIdx = insideRange.size() - 1; i >= 0; i--)
 	{
 		if (str[i] == '+' || str[i] == '-')
-			return new TreeNode(str.substr(i, 1), getComplexTree(str.substr(0, i)), getComplexTree(str.substr(i + 1, str.size() - i - 1)));
+		{
+			if (i != 0)
+				return new TreeNode(str.substr(i, 1), getComplexTree(str.substr(0, i)), getComplexTree(str.substr(i + 1, str.size() - i - 1)));
+			else
+				return new TreeNode(str.substr(0, 1), new TreeNode("0"), getComplexTree(str.substr(1)));
+		}
 		if (vecIdx >= 0 && insideRange[vecIdx].second.second == i)
 			i = insideRange[vecIdx--].second.first;
 	}
@@ -598,13 +604,8 @@ TreeNode* Parser::getComplexTree(const std::string &str)
 		}
 	}
 	// check for ! (not sign)
-	for (i = str.size() - 1, vecIdx = insideRange.size() - 1; i >= 0; i--)
-	{
-		if (str[i] == '!')
-			return new TreeNode("!", getComplexTree(str.substr(0, i)));
-		if (vecIdx >= 0 && insideRange[vecIdx].second.second == i)
-			i = insideRange[vecIdx--].second.first;
-	}
+	if (str[0] == '!')
+		return new TreeNode("!", getComplexTree(str.substr(1, str.length() - 1)));
 	// check if variable or raw value
 	if (isLegalVarName(str) || isLegalType(str))
 		return new TreeNode(str);
