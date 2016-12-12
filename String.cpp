@@ -42,17 +42,35 @@ Type* String::operator[] (std::vector<Type*> index) const
 		return new String(_value.substr(start, end - start));
 		break;
 	case 3:
-		if (index[0]->getTypeName() != ClassType::VoidC)
-			start = getFixedIndex((int)(*index[0]));
-		if (index[1]->getTypeName() != ClassType::VoidC)
-			end = getFixedIndex((int)(*index[1]));
 		if (index[2]->getTypeName() != ClassType::VoidC)
 			step = (int)(*index[2]);
-		while (start < end)
+		if (index[0]->getTypeName() != ClassType::VoidC)
+			start = getFixedIndex((int)(*index[0]));
+		else if (step < 0)
+			start = _value.size() - 1;
+		if (index[1]->getTypeName() != ClassType::VoidC)
+			end = getFixedIndex((int)(*index[1]));
+		else if (step < 0)
+			end = - 1;
+		if (step > 0)
 		{
-			newStr += _value[start];
-			start += step;
+			while (start < end)
+			{
+				newStr += _value[start];
+				start += step;
+			}
 		}
+		else if (step < 0)
+		{
+			while (start > end)
+			{
+				newStr += _value[start];
+				start += step;
+			}
+		}
+		else
+			throw new InterperterException(); // should be a different error
+
 		return new String(newStr);
 		break;
 	default:
