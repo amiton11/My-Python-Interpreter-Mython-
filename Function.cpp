@@ -87,10 +87,10 @@ bool Function::parseInto(std::string preIndent)
 			curIndent = unindentLine.substr(0, firstChar);
 		}
 		Helper::trim(unindentLine);
-		if (Parser::isLegalReturn(input_string))
-			curLine = new TreeNode("return", Parser::getComplexTree(Parser::getCleanStr(input_string.substr(7, input_string.size() - 7))));
+		if (Parser::isLegalReturn(unindentLine))
+			curLine = new TreeNode("return", Parser::getComplexTree(Parser::getCleanStr(unindentLine.substr(7, unindentLine.size() - 7))));
 		else
-			curLine = Parser::getComplexTree(Parser::getCleanStr(input_string));
+			curLine = Parser::getComplexTree(Parser::getCleanStr(unindentLine));
 		
 		_lines.push_back(curLine);
 
