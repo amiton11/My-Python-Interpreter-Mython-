@@ -26,7 +26,7 @@ public:
 	std::vector<std::string> getParameters() const;
 	void setParameters(std::vector<std::string> parameters);
 
-	bool parseInto();
+	bool parseInto(std::string preIndent = "");
 
 	Type* run(std::vector<Type*> parameters);
 

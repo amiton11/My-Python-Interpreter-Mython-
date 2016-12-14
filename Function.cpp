@@ -62,18 +62,31 @@ Type* Function::run(std::vector<Type*> parameters)
 	return new Void();
 }
 
-bool Function::parseInto()
+bool Function::parseInto(std::string preIndent)
 {
 	std::string input_string;
 
 	// get new command from user
 	std::cout << ">>> ";
 	std::getline(std::cin, input_string);
+	
+	std::string curIndent = "";
 
-	while (input_string != "" && (input_string[0] == ' ' || input_string[0] == '\t'))
-	{
+	while (input_string.size() > preIndent.size() + (curIndent.size() == 0 ? 1 : curIndent.size()) && input_string.substr(0, preIndent.size()) == preIndent
+		&& (curIndent == "" || input_string.substr(preIndent.size(), curIndent.size()) == curIndent)) 
+	{// while line starts with previous indents and either has a certain new indent if first line, or matches also the indents of previous line in function
 		TreeNode* curLine;
-		Helper::trim(input_string);
+		std::string unindentLine = input_string.substr(preIndent.size(), input_string.size() - preIndent.size());
+		if (curIndent == "")
+		{ 
+			auto firstChar = unindentLine.find_first_not_of(" \t");
+			if (firstChar == unindentLine.npos)
+				return false;
+			if (firstChar == 0)
+				break;
+			curIndent = unindentLine.substr(0, firstChar);
+		}
+		Helper::trim(unindentLine);
 		if (Parser::isLegalReturn(input_string))
 			curLine = new TreeNode("return", Parser::getComplexTree(Parser::getCleanStr(input_string.substr(7, input_string.size() - 7))));
 		else

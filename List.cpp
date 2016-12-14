@@ -140,7 +140,11 @@ Type* List::clone() const
 Type* List::operator+(Type* other)
 {
 	List* returnList = (List*)clone();
-	returnList->push(other);
+	if (other->getTypeName() != ClassType::ListC)
+		returnList->push(other);
+	else
+		for each (auto item in ((List*)other)->getValue())
+			returnList->push(item);
 	return returnList;
 }
 Type* List::operator*(Type* other)
